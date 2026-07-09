@@ -1,8 +1,11 @@
 #include <iostream>
 
+#include "../concepts/ordered.h"
+
 namespace jim {
     namespace containers {
         template <typename T, int U>
+        requires jim::concepts::Ordered<T>
         class UnrolledBinaryTreeNode {
         public:
             T elements[U];
