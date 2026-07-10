@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iterator>
 
 #include "../concepts/ordered.h"
 
@@ -7,13 +8,15 @@ namespace jim {
         template <typename T, int U>
         requires jim::concepts::Ordered<T>
         class UnrolledBinaryTreeNode {
-        public:
+
+        private:
             T elements[U];
             int element_count;
             UnrolledBinaryTreeNode<T, U>* left;
             UnrolledBinaryTreeNode<T, U>* right;
             UnrolledBinaryTreeNode<T, U>* parent; // if a given node becomes completely empty, it is removed
 
+        public:
             UnrolledBinaryTreeNode(UnrolledBinaryTreeNode<T, U>* parent)
             : elements{ { } }
             , element_count{ 0 }
@@ -159,13 +162,117 @@ namespace jim {
                     right->print();
                 }
             }
+
+            // --- The Iterator Class ---
+            class Iterator {
+            public:
+                // Required type aliases for STL compatibility
+                using iterator_category = std::forward_iterator_tag;
+                using value_type        = T;
+                using difference_type   = std::ptrdiff_t;
+                using pointer           = T*;
+                using reference         = T&;
+
+                // Constructor
+                explicit Iterator(UnrolledBinaryTreeNode<T, U>* node, int index)
+                    : node(node)
+                    , index(index) {}
+
+                // 1. Dereference operators
+                reference operator*() const { return node->elements[index]; }
+                pointer operator->() { return &(node->elements[index]); }
+
+                // 2. Prefix increment: ++it
+                Iterator& operator++() {
+                    index++;
+                    if (index == node->element_count) {
+                        index = 0;
+
+                        if (node->right != nullptr) {
+                            node = node->right;
+                            while (node->left != nullptr) {
+                                node = node->left;
+                            }
+                        } else {
+                            // Keep traversing up the tree while this is the "right" child.
+                            // Then traverse up once to the left.
+                            while ((node->parent != nullptr) && (node->parent->right == node)) {
+                                node = node->parent;
+                            }
+
+                            // This should be the "left" child now. Go up one more level.
+                            node = node->parent;
+                        }
+                    }
+
+                    return Iterator(node, index);
+                }
+
+                // 3. Postfix increment: it++
+                Iterator operator++(int) {
+                    Iterator tmp = Iterator(node, index);
+
+                    index++;
+                    if (index == node->element_count) {
+                        index = 0;
+
+                        if (node->right != nullptr) {
+                            node = node->right;
+                            while (node->left != nullptr) {
+                                node = node->left;
+                            }
+                        } else {
+                            // Keep traversing up the tree while this is the "right" child.
+                            // Then traverse up once to the left.
+                            while ((node->parent != nullptr) && (node->parent->right == node)) {
+                                node = node->parent;
+                            }
+
+                            // This should be the "left" child now. Go up one more level.
+                            node = node->parent;
+                        }
+                    }
+
+                    return tmp;
+                }
+
+                // 4. Comparison operators
+                friend bool operator==(const Iterator& a, const Iterator& b) { return (a.node == b.node) && (a.index == b.index); }
+                friend bool operator!=(const Iterator& a, const Iterator& b) { return (a.node != b.node) || (a.index != b.index); }
+
+            private:
+                UnrolledBinaryTreeNode<T, U>* node;
+                int index;
+            };
+
+            // --- Container Methods ---
+            // Returns an iterator to the first element
+            Iterator begin() {
+                if (this->left != nullptr) {
+                    return this->left->begin();
+                }
+
+                return Iterator(this, 0);
+            }
+            
+            // Returns an iterator to the position past the last element
+            Iterator end()   {
+                if (this->right != nullptr) {
+                    return this->right->end();
+                }
+
+                return Iterator(nullptr, 0);
+            }
         };
 
         template <typename T, int U>
+        requires jim::concepts::Ordered<T>
         class UnrolledBinaryTree {
-        public:
+
+        private:
             UnrolledBinaryTreeNode<T, U> root;
 
+        public:
             UnrolledBinaryTree() {};
 
             bool contains(T value) {
@@ -185,6 +292,12 @@ namespace jim {
                 root.print();
                 std::cout << "-----" << std::endl;
             }
+
+            // Re-export of UnrolledBinaryTreeNode iterator.
+            using Iterator = typename UnrolledBinaryTreeNode<T, U>::Iterator;
+
+            Iterator begin() { return root.begin(); }
+            Iterator end()   { return root.end(); }
         };
    }
 }

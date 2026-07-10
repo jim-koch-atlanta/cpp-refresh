@@ -93,6 +93,23 @@ namespace jim {
             }
         }
 
+        void testIterator() {
+            {
+                std::cout << "Case 1:" << std::endl;
+                UnrolledBinaryTree<int, 10> tree;
+
+                // Insert values 1 to 30.
+                for (int i = 1; i <= 30; i++) {
+                    tree.insert(i);
+                }
+
+                // Print the values in the tree.
+                for (auto it = tree.begin(); it != tree.end(); it++) {
+                    std::cout << *it << std::endl;
+                }
+            }
+        }
+
         class Programmer {
         public:
             std::string firstName;
@@ -120,6 +137,14 @@ namespace jim {
                         (x.leadership == y.leadership) &&
                         (x.lastName == y.lastName) &&
                         (x.firstName == y.firstName));
+            }
+
+            friend bool operator<=(const Programmer& x, const Programmer& y) {
+                return !(x > y);
+            }
+
+            friend bool operator>=(const Programmer& x, const Programmer& y) {
+                return !(x < y);
             }
 
             // I could have just used the defaults like:
@@ -157,6 +182,7 @@ namespace jim {
         int main(int argc, char** argv) {
             testInts();
             testUserDefinedTypes();
+            testIterator();
             
             std::cout << "All tests passed.\n";
             return 0;
