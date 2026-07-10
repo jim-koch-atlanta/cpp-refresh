@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <format>
+#include <ranges>
 
 #include "../containers/unrolled-binary-tree.h"
 
@@ -104,9 +106,41 @@ namespace jim {
                 }
 
                 // Print the values in the tree.
-                for (auto it = tree.begin(); it != tree.end(); it++) {
-                    std::cout << *it << std::endl;
+                for (const auto& x : tree) {
+                    std::cout << x << '\n';
                 }
+
+                // Use a range too.
+                std::ranges::for_each(tree, [](const auto& x) { std::cout << x << ' '; });
+                std::cout << '\n';
+            }
+        }
+
+        void testRuleOfFive() {
+            {
+                std::cout << "Case 1: Copy constructor" << std::endl;
+                UnrolledBinaryTree<int, 10> tree1;
+                UnrolledBinaryTree<int, 10> tree2(tree1);
+            }
+
+            {
+                std::cout << "Case 2: Copy operator" << std::endl;
+                UnrolledBinaryTree<int, 10> tree1;
+                UnrolledBinaryTree<int, 10> tree2;
+                tree2 = tree1;
+            }
+
+           {
+                std::cout << "Case 3: Move constructor" << std::endl;
+                UnrolledBinaryTree<int, 10> tree1;
+                UnrolledBinaryTree<int, 10> tree2(std::move(tree1));
+            }
+
+           {
+                std::cout << "Case 4: Move operator" << std::endl;
+                UnrolledBinaryTree<int, 10> tree1;
+                UnrolledBinaryTree<int, 10> tree2;
+                tree2 = std::move(tree1);
             }
         }
 
@@ -183,7 +217,8 @@ namespace jim {
             testInts();
             testUserDefinedTypes();
             testIterator();
-            
+            testRuleOfFive();
+
             std::cout << "All tests passed.\n";
             return 0;
         }

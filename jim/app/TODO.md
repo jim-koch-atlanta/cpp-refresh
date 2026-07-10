@@ -10,8 +10,8 @@
 8. Performance testing with ring buffer allocator vs with default allocator. Number of allocs / deallocs. Maybe some sort of actual performance metrics (Wall clock? CPU clock?)
   * Benchmark harness -- `<chrono> steady_clock` for wall time, and reuse TrackingAllocator to count allocs/deallocs.
   * Compare my allocator vs. `std::pmr::monotonic_buffer_resource`.
-9. Rule of Five. Define deep-copy and move for the whole tree.
-  * (Why are we making the move noexcept???)
+9. [DONE] Rule of Five. Define deep-copy and move for the whole tree.
+  * (Why are we making the move noexcept? Because standard library containers guarantee strong exception safety. If a move failed midway, both the source and destination would be in a bad state. As a result, the standard library falls back to **copy** for any containers where the element types do not have `noexcept` move constructors / operators.)
 10. operator<=> / operator==
 11. operator<< as a hidden friend
   * [DONE] Also make the member variables of tree and node private.

@@ -33,7 +33,45 @@ namespace jim {
             , parent{ nullptr }
              { }
 
-             bool contains(T value) {
+        public:
+            ~UnrolledBinaryTreeNode() {
+                // Post-order recursive cleanup
+                delete left;
+                delete right;
+            }
+
+            // Nothing should be directly copying nodes.
+            UnrolledBinaryTreeNode(const UnrolledBinaryTreeNode&) = delete;
+
+            // Nothing should be directly copying nodes.
+            UnrolledBinaryTreeNode& operator=(const UnrolledBinaryTreeNode&) = delete;
+
+            UnrolledBinaryTreeNode* clone(UnrolledBinaryTreeNode* parent = nullptr) const {
+                auto* newNode = new UnrolledBinaryTreeNode();
+
+                newNode->element_count = element_count;
+                for (int i = 0; i < element_count; ++i) {
+                    newNode->elements[i] = elements[i];  // reads privates fine
+                }
+
+                newNode->parent = parent;
+
+                if (left) {
+                    newNode->left = left->clone(newNode);
+                } else {
+                    newNode->left = nullptr;
+                }
+
+                if (right) {
+                    newNode->right = right->clone(newNode);
+                } else {
+                    newNode->right = nullptr;
+                }
+
+                return newNode;
+            }
+
+            bool contains(T value) {
                 if (this->element_count == 0) {
                     return false;
                 }
@@ -60,9 +98,9 @@ namespace jim {
                 }
 
                 return false;
-             }
+            }
 
-             void insert(T value) {
+            void insert(T value) {
                 if (this->element_count == U) {
                     if (value < elements[0]) {
                         if (this->left == nullptr) {
@@ -115,9 +153,9 @@ namespace jim {
                     this->elements[index] = value;
                     element_count++;
                 }
-             }
+            }
 
-             bool remove(T value) {
+            bool remove(T value) {
                 // TODO: Get rid of this node if its element_count drops to 0.
                 if (element_count > 0) {
                     if (value < elements[0]) {
@@ -147,9 +185,9 @@ namespace jim {
 
                 return ((left != nullptr && left->remove(value)) ||
                         (right != nullptr && right->remove(value)));
-             }
+            }
 
-             void print() {
+            void print() {
                 if (left != nullptr) {
                     left->print();
                 }
@@ -172,6 +210,9 @@ namespace jim {
                 using difference_type   = std::ptrdiff_t;
                 using pointer           = T*;
                 using reference         = T&;
+
+                // Default constructor, needed for algorithms.
+                Iterator() : node(nullptr), index(0) {}
 
                 // Constructor
                 explicit Iterator(UnrolledBinaryTreeNode<T, U>* node, int index)
@@ -205,7 +246,7 @@ namespace jim {
                         }
                     }
 
-                    return Iterator(node, index);
+                    return *this;
                 }
 
                 // 3. Postfix increment: it++
@@ -270,34 +311,78 @@ namespace jim {
         class UnrolledBinaryTree {
 
         private:
-            UnrolledBinaryTreeNode<T, U> root;
+            UnrolledBinaryTreeNode<T, U>* root;
 
         public:
-            UnrolledBinaryTree() {};
+            UnrolledBinaryTree() {
+                root = new UnrolledBinaryTreeNode<T, U>();
+            };
+
+            // 1. Destructor
+            ~UnrolledBinaryTree() {
+                delete root;
+            }
+
+            // 2. Copy Constructor (Deep Copy)
+            UnrolledBinaryTree(const UnrolledBinaryTree& other) {
+                root = other.root->clone();
+                std::cout << "Copy constructed\n";
+            }
+
+            friend void swap(UnrolledBinaryTree& first, UnrolledBinaryTree& second) noexcept {
+                std::swap(first.root, second.root);
+            }
+
+            // 3. Copy Operator (via copy-and-swap idiom)
+            UnrolledBinaryTree& operator=(const UnrolledBinaryTree& other) {
+                UnrolledBinaryTree tmp(other);   // deep copy (via your copy ctor / clone)
+                swap(*this, tmp);                // swap the pointers
+                return *this;
+            }                                    // tmp destructs → frees *this's OLD tree
+
+            // 4. Move Constructor
+            UnrolledBinaryTree(UnrolledBinaryTree&& other) noexcept {
+                root = other.root;
+                other.root = nullptr;
+                std::cout << "Move constructed\n";
+            }
+
+            // 5. Move Operator
+            UnrolledBinaryTree& operator=(UnrolledBinaryTree&& other) noexcept {
+                if (this != &other) {
+                    delete root;
+                    root = other.root;
+                    other.root = nullptr;
+                }
+
+                std::cout << "Move operated\n";
+
+                return *this;
+        }
 
             bool contains(T value) {
-                return root.contains(value);
+                return root->contains(value);
             }
 
             void insert(T value) {
-                return root.insert(value);
+                return root->insert(value);
             }
 
             bool remove(T value) {
-                return root.remove(value);
+                return root->remove(value);
             }
 
             void print() {
                 std::cout << "-----" << std::endl;
-                root.print();
+                root->print();
                 std::cout << "-----" << std::endl;
             }
 
             // Re-export of UnrolledBinaryTreeNode iterator.
             using Iterator = typename UnrolledBinaryTreeNode<T, U>::Iterator;
 
-            Iterator begin() { return root.begin(); }
-            Iterator end()   { return root.end(); }
+            Iterator begin() { return root->begin(); }
+            Iterator end()   { return root->end(); }
         };
    }
 }
