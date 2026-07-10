@@ -1,6 +1,8 @@
 #include <algorithm>
+#include <cassert>
 #include <format>
 #include <ranges>
+#include <vector>
 
 #include "../containers/unrolled-binary-tree.h"
 
@@ -213,11 +215,46 @@ namespace jim {
             }
         }
 
+        // Exercises removing a node that has become empty and has two children.
+        void testEmptyNodeRemoval() {
+            std::cout << "=== testEmptyNodeRemoval ===" << std::endl;
+
+            UnrolledBinaryTree<int, 2> tree;
+            for (int v : {50, 51, 10, 90, 11, 5, 15}) {
+                tree.insert(v);
+            }
+
+            auto inorder = [&] {
+                std::vector<int> out;
+                for (int x : tree) out.push_back(x);   // relies on the in-order iterator
+                return out;
+            };
+
+            std::vector<int> before = inorder();
+            std::cout << "before: ";
+            for (int x : before) std::cout << x << ' ';
+            std::cout << '\n';
+            assert((before == std::vector<int>{5, 10, 11, 15, 50, 51, 90}));
+
+            // Empty node C ([10, 11]) -> triggers the two-children merge.
+            tree.remove(10);
+            tree.remove(11);
+
+            std::vector<int> after = inorder();
+            std::cout << "after:  ";
+            for (int x : after) std::cout << x << ' ';
+            std::cout << '\n';
+
+            // C is gone; its children [5] and [15] survived and are still in order.
+            assert((after == std::vector<int>{5, 15, 50, 51, 90}));
+        }
+
         int main(int argc, char** argv) {
             testInts();
             testUserDefinedTypes();
             testIterator();
             testRuleOfFive();
+            testEmptyNodeRemoval();
 
             std::cout << "All tests passed.\n";
             return 0;

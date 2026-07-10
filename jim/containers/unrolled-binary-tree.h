@@ -100,6 +100,86 @@ namespace jim {
                 return false;
             }
 
+            void removeChildNode(UnrolledBinaryTreeNode* childNode) {
+                // If it's a leaf node, just delete it.
+                if (childNode->left == nullptr && childNode->right == nullptr) {
+                    if (childNode == left) {
+                        left = nullptr;
+                    }
+                    if (childNode == right) {
+                        right = nullptr;
+                    }
+                    delete childNode;
+                    return;
+                }
+
+                if (childNode == left) {
+                    if (childNode->left == nullptr) {
+                        left = childNode->right;
+                        childNode->right->parent = this;
+                        childNode->right = nullptr;
+                        delete childNode;
+                        return;
+                    } else if (childNode->right == nullptr) {
+                        left = childNode->left;
+                        childNode->left->parent = this;
+                        childNode->left = nullptr;
+                        delete childNode;
+                        return;
+                    } else { // the child node has two children.
+                        // Merge childNode's subtrees: everything in its left subtree (L)
+                        // is < everything in its right subtree (R), so hang R off the
+                        // rightmost (max) node of L, then promote L into this slot.
+                        left = childNode->left;
+                        childNode->left->parent = this;
+
+                        auto maxOfLeft = childNode->left;
+                        while (maxOfLeft->right != nullptr) {
+                            maxOfLeft = maxOfLeft->right;
+                        }
+                        maxOfLeft->right = childNode->right;
+                        childNode->right->parent = maxOfLeft;
+
+                        childNode->left = nullptr;
+                        childNode->right = nullptr;
+                        delete childNode;
+                    }
+                }
+                else if (childNode == right) {
+                    if (childNode->left == nullptr) {
+                        right = childNode->right;
+                        childNode->right->parent = this;
+                        childNode->right = nullptr;
+                        delete childNode;
+                        return;
+                    } else if (childNode->right == nullptr) {
+                        right = childNode->left;
+                        childNode->left->parent = this;
+                        childNode->left = nullptr;
+                        delete childNode;
+                        return;
+                    } else { // the child node has two children.
+                        // Same merge as the left branch, but promoting into `right`.
+                        right = childNode->left;
+                        childNode->left->parent = this;
+
+                        auto maxOfLeft = childNode->left;
+                        while (maxOfLeft->right != nullptr) {
+                            maxOfLeft = maxOfLeft->right;
+                        }
+                        maxOfLeft->right = childNode->right;
+                        childNode->right->parent = maxOfLeft;
+
+                        childNode->left = nullptr;
+                        childNode->right = nullptr;
+                        delete childNode;
+                    }
+                }
+                else {
+                    // Should never happen.
+                }
+            }
+
             void insert(T value) {
                 if (this->element_count == U) {
                     if (value < elements[0]) {
@@ -160,12 +240,20 @@ namespace jim {
                 if (element_count > 0) {
                     if (value < elements[0]) {
                         if (left != nullptr) {
-                            return left->remove(value);
+                            auto result = left->remove(value);
+                            if (left->element_count == 0) {
+                                removeChildNode(left);
+                            }
+                            return result;
                         }
                         return false;
                     } else if (value > elements[element_count - 1]) {
                         if (right != nullptr) {
-                            return right->remove(value);
+                            auto result = right->remove(value);
+                            if (right->element_count == 0) {
+                                removeChildNode(right);
+                            }
+                            return result;
                         }
                         return false;
                     }
