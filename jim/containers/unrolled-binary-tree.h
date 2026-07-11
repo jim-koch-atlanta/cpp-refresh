@@ -1,13 +1,25 @@
+#pragma once
+
 #include <iostream>
 #include <iterator>
+#include <memory>
+#include <utility>
 
 #include "../concepts/ordered.h"
 
 namespace jim {
     namespace containers {
+
+        // The node stays "pure structure": it knows nothing about allocation.
+        // Any method that needs to create/destroy nodes takes a `Factory&`
+        // (see NodeFactory below) -- threaded in, never stored, so nodes stay small.
         template <typename T, int U>
         requires jim::concepts::Ordered<T>
         class UnrolledBinaryTreeNode {
+
+            // The factory owns the allocator and needs to read left/right during
+            // teardown, so every NodeFactory specialization is a friend.
+            template <typename, int, typename> friend class NodeFactory;
 
         private:
             T elements[U];
@@ -31,23 +43,16 @@ namespace jim {
             , left{ nullptr }
             , right{ nullptr }
             , parent{ nullptr }
-             { }
-
-        public:
-            ~UnrolledBinaryTreeNode() {
-                // Post-order recursive cleanup
-                delete left;
-                delete right;
-            }
+            { }
 
             // Nothing should be directly copying nodes.
             UnrolledBinaryTreeNode(const UnrolledBinaryTreeNode&) = delete;
-
-            // Nothing should be directly copying nodes.
             UnrolledBinaryTreeNode& operator=(const UnrolledBinaryTreeNode&) = delete;
 
-            UnrolledBinaryTreeNode* clone(UnrolledBinaryTreeNode* parent = nullptr) const {
-                auto* newNode = new UnrolledBinaryTreeNode();
+            // Deep-copy this subtree. Allocates via the factory, so it is threaded in.
+            template <typename Factory>
+            UnrolledBinaryTreeNode* clone(Factory& factory, UnrolledBinaryTreeNode* parent = nullptr) const {
+                auto* newNode = factory.make_node();
 
                 newNode->element_count = element_count;
                 for (int i = 0; i < element_count; ++i) {
@@ -57,13 +62,13 @@ namespace jim {
                 newNode->parent = parent;
 
                 if (left) {
-                    newNode->left = left->clone(newNode);
+                    newNode->left = left->clone(factory, newNode);
                 } else {
                     newNode->left = nullptr;
                 }
 
                 if (right) {
-                    newNode->right = right->clone(newNode);
+                    newNode->right = right->clone(factory, newNode);
                 } else {
                     newNode->right = nullptr;
                 }
@@ -100,7 +105,8 @@ namespace jim {
                 return false;
             }
 
-            void removeChildNode(UnrolledBinaryTreeNode* childNode) {
+            template <typename Factory>
+            void removeChildNode(UnrolledBinaryTreeNode* childNode, Factory& factory) {
                 // If it's a leaf node, just delete it.
                 if (childNode->left == nullptr && childNode->right == nullptr) {
                     if (childNode == left) {
@@ -109,7 +115,7 @@ namespace jim {
                     if (childNode == right) {
                         right = nullptr;
                     }
-                    delete childNode;
+                    factory.destroy_node(childNode);
                     return;
                 }
 
@@ -118,13 +124,13 @@ namespace jim {
                         left = childNode->right;
                         childNode->right->parent = this;
                         childNode->right = nullptr;
-                        delete childNode;
+                        factory.destroy_node(childNode);
                         return;
                     } else if (childNode->right == nullptr) {
                         left = childNode->left;
                         childNode->left->parent = this;
                         childNode->left = nullptr;
-                        delete childNode;
+                        factory.destroy_node(childNode);
                         return;
                     } else { // the child node has two children.
                         // Merge childNode's subtrees: everything in its left subtree (L)
@@ -142,7 +148,7 @@ namespace jim {
 
                         childNode->left = nullptr;
                         childNode->right = nullptr;
-                        delete childNode;
+                        factory.destroy_node(childNode);
                     }
                 }
                 else if (childNode == right) {
@@ -150,13 +156,13 @@ namespace jim {
                         right = childNode->right;
                         childNode->right->parent = this;
                         childNode->right = nullptr;
-                        delete childNode;
+                        factory.destroy_node(childNode);
                         return;
                     } else if (childNode->right == nullptr) {
                         right = childNode->left;
                         childNode->left->parent = this;
                         childNode->left = nullptr;
-                        delete childNode;
+                        factory.destroy_node(childNode);
                         return;
                     } else { // the child node has two children.
                         // Same merge as the left branch, but promoting into `right`.
@@ -172,7 +178,7 @@ namespace jim {
 
                         childNode->left = nullptr;
                         childNode->right = nullptr;
-                        delete childNode;
+                        factory.destroy_node(childNode);
                     }
                 }
                 else {
@@ -180,27 +186,28 @@ namespace jim {
                 }
             }
 
-            void insert(T value) {
+            template <typename Factory>
+            void insert(T value, Factory& factory) {
                 if (this->element_count == U) {
                     if (value < elements[0]) {
                         if (this->left == nullptr) {
                             // Create a new node. This is its parent.
-                            this->left = new UnrolledBinaryTreeNode<T, U>(this);
+                            this->left = factory.make_node(this);
                         }
-                        this->left->insert(value);
+                        this->left->insert(value, factory);
                     } else if (value > elements[this->element_count - 1]) {
                         if (this->right == nullptr) {
                             // Create a new node. This is its parent.
-                            this->right = new UnrolledBinaryTreeNode<T, U>(this);
+                            this->right = factory.make_node(this);
                         }
-                        this->right->insert(value);
+                        this->right->insert(value, factory);
                     } else {
                         // TODO: Choose left or right to be more balanced.
                         if (this->left == nullptr) {
                             // Create a new node. This is its parent.
-                            this->left = new UnrolledBinaryTreeNode<T, U>(this);
+                            this->left = factory.make_node(this);
                         }
-                        this->left->insert(elements[0]);
+                        this->left->insert(elements[0], factory);
                         // TODO: Switch this from a for-loop to maybe using iterator.
                         int index;
                         for (index = 0; index < element_count - 1; index++) {
@@ -235,23 +242,23 @@ namespace jim {
                 }
             }
 
-            bool remove(T value) {
-                // TODO: Get rid of this node if its element_count drops to 0.
+            template <typename Factory>
+            bool remove(T value, Factory& factory) {
                 if (element_count > 0) {
                     if (value < elements[0]) {
                         if (left != nullptr) {
-                            auto result = left->remove(value);
+                            auto result = left->remove(value, factory);
                             if (left->element_count == 0) {
-                                removeChildNode(left);
+                                removeChildNode(left, factory);
                             }
                             return result;
                         }
                         return false;
                     } else if (value > elements[element_count - 1]) {
                         if (right != nullptr) {
-                            auto result = right->remove(value);
+                            auto result = right->remove(value, factory);
                             if (right->element_count == 0) {
-                                removeChildNode(right);
+                                removeChildNode(right, factory);
                             }
                             return result;
                         }
@@ -271,8 +278,8 @@ namespace jim {
                     return false;
                 }
 
-                return ((left != nullptr && left->remove(value)) ||
-                        (right != nullptr && right->remove(value)));
+                return ((left != nullptr && left->remove(value, factory)) ||
+                        (right != nullptr && right->remove(value, factory)));
             }
 
             void print() {
@@ -383,7 +390,7 @@ namespace jim {
 
                 return Iterator(this, 0);
             }
-            
+
             // Returns an iterator to the position past the last element
             Iterator end()   {
                 if (this->right != nullptr) {
@@ -394,39 +401,87 @@ namespace jim {
             }
         };
 
-        template <typename T, int U>
+        // Owns the (rebound) allocator and is the single place that creates and
+        // destroys nodes. The tree holds one of these and threads it into the
+        // node methods that allocate.
+        template <typename T, int U, typename Alloc = std::allocator<T>>
+        class NodeFactory {
+            using Node       = UnrolledBinaryTreeNode<T, U>;
+            using NodeAlloc  = typename std::allocator_traits<Alloc>::template rebind_alloc<Node>;
+            using NodeTraits = std::allocator_traits<NodeAlloc>;
+
+            NodeAlloc alloc_;
+
+        public:
+            NodeFactory() = default;
+            explicit NodeFactory(const Alloc& a) : alloc_(a) {}
+
+            // allocate raw memory for one node, then construct the node in it
+            template <typename... Args>
+            Node* make_node(Args&&... args) {
+                Node* p = NodeTraits::allocate(alloc_, 1);
+                NodeTraits::construct(alloc_, p, std::forward<Args>(args)...);
+                return p;
+            }
+
+            // destroy one node (run its destructor), then free its memory
+            void destroy_node(Node* p) {
+                NodeTraits::destroy(alloc_, p);
+                NodeTraits::deallocate(alloc_, p, 1);
+            }
+
+            // post-order teardown of an entire subtree
+            void destroy_subtree(Node* p) {
+                if (p != nullptr) {
+                    destroy_subtree(p->left);
+                    destroy_subtree(p->right);
+                    destroy_node(p);
+                }
+            }
+        };
+
+        template <typename T, int U, typename Alloc = std::allocator<T>>
         requires jim::concepts::Ordered<T>
         class UnrolledBinaryTree {
 
+            using Node    = UnrolledBinaryTreeNode<T, U>;
+            using Factory = NodeFactory<T, U, Alloc>;
+
         private:
-            UnrolledBinaryTreeNode<T, U>* root;
+            Node* root;
+            Factory factory;   // owns the allocator; single source of node lifecycle
 
         public:
             UnrolledBinaryTree() {
-                root = new UnrolledBinaryTreeNode<T, U>();
-            };
+                root = factory.make_node();
+            }
 
-            // 1. Destructor
+            // 1. Destructor.
             ~UnrolledBinaryTree() {
-                delete root;
+                // DFS teardown via the factory, since we support custom allocators.
+                factory.destroy_subtree(root);
             }
 
             // 2. Copy Constructor (Deep Copy)
             UnrolledBinaryTree(const UnrolledBinaryTree& other) {
-                root = other.root->clone();
+                root = other.root->clone(factory);
                 std::cout << "Copy constructed\n";
             }
 
             friend void swap(UnrolledBinaryTree& first, UnrolledBinaryTree& second) noexcept {
                 std::swap(first.root, second.root);
+                // NOTE: stateless std::allocator -> memory is interchangeable, so we don't
+                // swap `factory`. A *stateful* allocator (e.g. the ring buffer) would need
+                // allocator-propagation handling here.
             }
 
             // 3. Copy Operator (via copy-and-swap idiom)
             UnrolledBinaryTree& operator=(const UnrolledBinaryTree& other) {
-                UnrolledBinaryTree tmp(other);   // deep copy (via your copy ctor / clone)
-                swap(*this, tmp);                // swap the pointers
+                UnrolledBinaryTree tmp(other);   // deep copy (via copy ctor / clone)
+                swap(*this, tmp);                // swap the roots
+                std::cout << "Copy operated\n";
                 return *this;
-            }                                    // tmp destructs → frees *this's OLD tree
+            }                                    // tmp destructs -> frees *this's OLD tree
 
             // 4. Move Constructor
             UnrolledBinaryTree(UnrolledBinaryTree&& other) noexcept {
@@ -438,26 +493,24 @@ namespace jim {
             // 5. Move Operator
             UnrolledBinaryTree& operator=(UnrolledBinaryTree&& other) noexcept {
                 if (this != &other) {
-                    delete root;
+                    factory.destroy_subtree(root);   // free our whole existing tree
                     root = other.root;
                     other.root = nullptr;
                 }
-
                 std::cout << "Move operated\n";
-
                 return *this;
-        }
+            }
 
             bool contains(T value) {
                 return root->contains(value);
             }
 
             void insert(T value) {
-                return root->insert(value);
+                root->insert(value, factory);
             }
 
             bool remove(T value) {
-                return root->remove(value);
+                return root->remove(value, factory);
             }
 
             void print() {
@@ -467,7 +520,7 @@ namespace jim {
             }
 
             // Re-export of UnrolledBinaryTreeNode iterator.
-            using Iterator = typename UnrolledBinaryTreeNode<T, U>::Iterator;
+            using Iterator = typename Node::Iterator;
 
             Iterator begin() { return root->begin(); }
             Iterator end()   { return root->end(); }
