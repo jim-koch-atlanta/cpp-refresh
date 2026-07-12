@@ -1,3 +1,6 @@
 *.exe
 
 .vscode
+
+CLAUDE.md
+CPP_REFRESH_STATUS.md

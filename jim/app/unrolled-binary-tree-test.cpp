@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "../containers/unrolled-binary-tree.h"
+#include "../allocators/pool-allocator.h"
 
 using jim::containers::UnrolledBinaryTree;
 using jim::containers::UnrolledBinaryTreeNode;
@@ -12,6 +13,7 @@ using jim::containers::UnrolledBinaryTreeNode;
 namespace jim {
     namespace app {
         void testInts() {
+            std::cout << "=== testInts ===" << std::endl;
             {
                 std::cout << "Case 1:" << std::endl;
                 UnrolledBinaryTree<int, 10> tree;
@@ -98,6 +100,7 @@ namespace jim {
         }
 
         void testIterator() {
+            std::cout << "=== testIterator ===" << std::endl;
             {
                 std::cout << "Case 1:" << std::endl;
                 UnrolledBinaryTree<int, 10> tree;
@@ -119,6 +122,7 @@ namespace jim {
         }
 
         void testRuleOfFive() {
+            std::cout << "=== testRuleOfFive ===" << std::endl;
             {
                 std::cout << "Case 1: Copy constructor" << std::endl;
                 UnrolledBinaryTree<int, 10> tree1;
@@ -197,6 +201,7 @@ namespace jim {
         };
 
         void testUserDefinedTypes() {
+            std::cout << "=== testUserDefinedTypes ===" << std::endl;
             {
                 std::cout << "Case 1:" << std::endl;
                 UnrolledBinaryTree<Programmer, 10> tree;
@@ -249,12 +254,47 @@ namespace jim {
             assert((after == std::vector<int>{5, 15, 50, 51, 90}));
         }
 
+        // Exercise the custom allocator.
+        void testCustomAllocator() {
+            std::cout << "=== testCustomAllocator ===" << std::endl;
+
+            UnrolledBinaryTree<int, 2, jim::allocators::PoolAllocator<int>> tree;
+            for (int v : {50, 51, 10, 90, 11, 5, 15}) {
+                tree.insert(v);
+            }
+
+            auto inorder = [&] {
+                std::vector<int> out;
+                for (int x : tree) out.push_back(x);   // relies on the in-order iterator
+                return out;
+            };
+
+            std::vector<int> before = inorder();
+            std::cout << "before: ";
+            for (int x : before) std::cout << x << ' ';
+            std::cout << '\n';
+            assert((before == std::vector<int>{5, 10, 11, 15, 50, 51, 90}));
+
+            // Empty node C ([10, 11]) -> triggers the two-children merge.
+            tree.remove(10);
+            tree.remove(11);
+
+            std::vector<int> after = inorder();
+            std::cout << "after:  ";
+            for (int x : after) std::cout << x << ' ';
+            std::cout << '\n';
+
+            // C is gone; its children [5] and [15] survived and are still in order.
+            assert((after == std::vector<int>{5, 15, 50, 51, 90}));
+        }
+
         int main(int argc, char** argv) {
             testInts();
             testUserDefinedTypes();
             testIterator();
             testRuleOfFive();
             testEmptyNodeRemoval();
+            testCustomAllocator();
 
             std::cout << "All tests passed.\n";
             return 0;

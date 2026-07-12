@@ -4,10 +4,10 @@
   * Define my own concept, rather than using a built-in concept type. This is for my own learning.
 4. [DONE] Make sure it works with some defined type (a struct, or a class).
 5. [DONE] In-order iterator.
-6. Implement my own **allocator**.
-  * Do a ring buffer... that could be interesting and fun.
-7. Update my BST to use the ring buffer allocator.
-8. Performance testing with ring buffer allocator vs with default allocator. Number of allocs / deallocs. Maybe some sort of actual performance metrics (Wall clock? CPU clock?)
+6. [DONE] Implement my own **allocator**.
+  * [EDIT] Do a pool allocator. It's a straightforward implementation that aligns with this use case. (Original Proposal: Do a ring buffer, because that could be interesting and fun. But the ring buffer's usage doesn't make sense.)
+7. [DONE] Update my BST to use the custom allocator.
+8. Performance testing with custom allocator vs with default allocator. Number of allocs / deallocs. Maybe some sort of actual performance metrics (Wall clock? CPU clock?)
   * Benchmark harness -- `<chrono> steady_clock` for wall time, and reuse TrackingAllocator to count allocs/deallocs.
   * Compare my allocator vs. `std::pmr::monotonic_buffer_resource`.
 9. [DONE] Rule of Five. Define deep-copy and move for the whole tree.

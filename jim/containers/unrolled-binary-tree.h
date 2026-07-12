@@ -449,26 +449,33 @@ namespace jim {
 
         private:
             Node* root;
-            Factory factory;   // owns the allocator; single source of node lifecycle
+            Factory* factory;   // owns the allocator; single source of node lifecycle
 
         public:
             UnrolledBinaryTree() {
-                root = factory.make_node();
+                factory = new Factory();
+                root = factory->make_node();
             }
 
             // 1. Destructor.
             ~UnrolledBinaryTree() {
-                // DFS teardown via the factory, since we support custom allocators.
-                factory.destroy_subtree(root);
+                // On a move, factory would be null.
+                if (factory != nullptr) {
+                   // DFS teardown via the factory, since we support custom allocators.
+                    factory->destroy_subtree(root);
+                    delete factory;
+                }
             }
 
             // 2. Copy Constructor (Deep Copy)
             UnrolledBinaryTree(const UnrolledBinaryTree& other) {
-                root = other.root->clone(factory);
+                factory = new Factory();
+                root = other.root->clone(*factory);
                 std::cout << "Copy constructed\n";
             }
 
             friend void swap(UnrolledBinaryTree& first, UnrolledBinaryTree& second) noexcept {
+                std::swap(first.factory, second.factory);
                 std::swap(first.root, second.root);
                 // NOTE: stateless std::allocator -> memory is interchangeable, so we don't
                 // swap `factory`. A *stateful* allocator (e.g. the ring buffer) would need
@@ -486,16 +493,20 @@ namespace jim {
             // 4. Move Constructor
             UnrolledBinaryTree(UnrolledBinaryTree&& other) noexcept {
                 root = other.root;
+                factory = other.factory;
                 other.root = nullptr;
+                other.factory = nullptr;
                 std::cout << "Move constructed\n";
             }
 
             // 5. Move Operator
             UnrolledBinaryTree& operator=(UnrolledBinaryTree&& other) noexcept {
                 if (this != &other) {
-                    factory.destroy_subtree(root);   // free our whole existing tree
+                    factory->destroy_subtree(root);   // free our whole existing tree
                     root = other.root;
+                    factory = other.factory;
                     other.root = nullptr;
+                    other.factory= nullptr;
                 }
                 std::cout << "Move operated\n";
                 return *this;
@@ -506,11 +517,11 @@ namespace jim {
             }
 
             void insert(T value) {
-                root->insert(value, factory);
+                root->insert(value, *factory);
             }
 
             bool remove(T value) {
-                return root->remove(value, factory);
+                return root->remove(value, *factory);
             }
 
             void print() {
