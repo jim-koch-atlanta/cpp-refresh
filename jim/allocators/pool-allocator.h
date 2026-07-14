@@ -59,16 +59,23 @@ namespace jim {
             void deallocate(T* p, std::size_t n) noexcept {   // push back onto the head
                 if (!p) return;
 
+                auto pool0 = (int64_t) &(pool_[0]);
+                auto poolN = (int64_t) &(pool_[PoolSize * sizeof(FreeNode)]);
+                if (pool0 <= (int64_t) p && (int64_t) p < poolN)
+                {
+                    auto* node = reinterpret_cast<FreeNode*>(p);
+                    node->next = head;
+                    head = node;
+                    --allocated_count_;
+                    return;
+                }
                 if (heap_nodes.find(p) != heap_nodes.end()) {
                     heap_nodes.erase(p);
                     std::free(p);
                     return;
                 }
 
-                auto* node = reinterpret_cast<FreeNode*>(p);
-                node->next = head;
-                head = node;
-                --allocated_count_;
+                // We should never get here.
             }
 
             std::size_t allocated() const noexcept { return allocated_count_; }
