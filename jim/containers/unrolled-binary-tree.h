@@ -105,85 +105,96 @@ namespace jim {
                 return false;
             }
 
+            // Helper function to find the minimum value node in a given subtree
+            UnrolledBinaryTreeNode* findMin(UnrolledBinaryTreeNode* node) {
+                while (node && node->left != nullptr) {
+                    node = node->left;
+                }
+                return node;
+            }            
+
+            // Helper function to find the minimum value node in a given subtree
+            void removeValue(UnrolledBinaryTreeNode* node, T value) {
+                bool found = false;
+                for (int i = 0; i < node->element_count; i++) {
+                    if (node->elements[i] == value) {
+                        found = true;
+                    }
+                    if (found && (i < node->element_count - 1)) {
+                        node->elements[i] = node->elements[i + 1];
+                    }
+                }
+
+                if (found) {
+                    node->element_count--;
+                }
+            }            
+
+            // Function to delete a node from the BST
             template <typename Factory>
-            void removeChildNode(UnrolledBinaryTreeNode* childNode, Factory& factory) {
-                // If it's a leaf node, just delete it.
-                if (childNode->left == nullptr && childNode->right == nullptr) {
-                    if (childNode == left) {
-                        left = nullptr;
-                    }
-                    if (childNode == right) {
-                        right = nullptr;
-                    }
-                    factory.destroy_node(childNode);
-                    return;
+            UnrolledBinaryTreeNode* remove(UnrolledBinaryTreeNode* node, T value, Factory& factory) {
+                // Base Case: The value does not exist in the tree
+                if (node == nullptr) {
+                    return node;
                 }
 
-                if (childNode == left) {
-                    if (childNode->left == nullptr) {
-                        left = childNode->right;
-                        childNode->right->parent = this;
-                        childNode->right = nullptr;
-                        factory.destroy_node(childNode);
-                        return;
-                    } else if (childNode->right == nullptr) {
-                        left = childNode->left;
-                        childNode->left->parent = this;
-                        childNode->left = nullptr;
-                        factory.destroy_node(childNode);
-                        return;
-                    } else { // the child node has two children.
-                        // Merge childNode's subtrees: everything in its left subtree (L)
-                        // is < everything in its right subtree (R), so hang R off the
-                        // rightmost (max) node of L, then promote L into this slot.
-                        left = childNode->left;
-                        childNode->left->parent = this;
-
-                        auto maxOfLeft = childNode->left;
-                        while (maxOfLeft->right != nullptr) {
-                            maxOfLeft = maxOfLeft->right;
-                        }
-                        maxOfLeft->right = childNode->right;
-                        childNode->right->parent = maxOfLeft;
-
-                        childNode->left = nullptr;
-                        childNode->right = nullptr;
-                        factory.destroy_node(childNode);
-                    }
-                }
-                else if (childNode == right) {
-                    if (childNode->left == nullptr) {
-                        right = childNode->right;
-                        childNode->right->parent = this;
-                        childNode->right = nullptr;
-                        factory.destroy_node(childNode);
-                        return;
-                    } else if (childNode->right == nullptr) {
-                        right = childNode->left;
-                        childNode->left->parent = this;
-                        childNode->left = nullptr;
-                        factory.destroy_node(childNode);
-                        return;
-                    } else { // the child node has two children.
-                        // Same merge as the left branch, but promoting into `right`.
-                        right = childNode->left;
-                        childNode->left->parent = this;
-
-                        auto maxOfLeft = childNode->left;
-                        while (maxOfLeft->right != nullptr) {
-                            maxOfLeft = maxOfLeft->right;
-                        }
-                        maxOfLeft->right = childNode->right;
-                        childNode->right->parent = maxOfLeft;
-
-                        childNode->left = nullptr;
-                        childNode->right = nullptr;
-                        factory.destroy_node(childNode);
-                    }
-                }
+                // Step 1: Navigate down the tree to locate the target node
+                if (value < node->elements[0]) {
+                    node->left = remove(node->left, value, factory);
+                } 
+                else if (value > node->elements[node->element_count - 1]) {
+                    node->right = remove(node->right, value, factory);
+                } 
+                // Step 2: The node matches the value; process the deletion
                 else {
-                    // Should never happen.
+                    if (node->element_count > 1) {
+                        // If there's more than one value, we don't have to delete a node.
+                        removeValue(node, value);
+                        return node;
+                    } else if (node->elements[0] != value) {
+                        // If there's only one value and it's not **the** value, just return.
+                        return node;
+                    }
+
+                    // There's only one value, and it's **the** value.
+
+                    // Case 1 & Case 2: Node has no children (leaf).
+                    if (node->left == nullptr && node->right == nullptr) {
+                        factory.destroy_node(node);
+                        return nullptr;
+                    }
+                    // Case 2: Node has no left child (handles right-child-only nodes)
+                    else if (node->left == nullptr) {
+                        UnrolledBinaryTreeNode* temp = node->right;
+                        factory.destroy_node(node);
+                        return temp;
+                    }
+                    // Case 3: Node has no right child (handles left-child-only nodes)
+                    else if (node->right == nullptr) {
+                        UnrolledBinaryTreeNode* temp = node->left;
+                        factory.destroy_node(node);
+                        return temp;
+                    }
+
+                    // Case 4: Node has two children
+                    // Get the inorder successor (smallest element in the right subtree)
+                    UnrolledBinaryTreeNode* temp = findMin(node->right);
+
+                    // Copy the inorder successor's data to this node
+                    node->element_count = temp->element_count;
+                    for (int i = 0; i < temp->element_count; i++) {
+                        node->elements[i] = temp->elements[i];
+                    }
+
+                    // Delete the inorder successor from the right subtree
+                    if (temp == temp->parent->left) {
+                        temp->parent->left = nullptr;
+                    } else {
+                        temp->parent->right = nullptr;
+                    }
+                    factory.destroy_node(temp);
                 }
+                return node;
             }
 
             template <typename Factory>
@@ -240,46 +251,6 @@ namespace jim {
                     this->elements[index] = value;
                     element_count++;
                 }
-            }
-
-            template <typename Factory>
-            bool remove(T value, Factory& factory) {
-                if (element_count > 0) {
-                    if (value < elements[0]) {
-                        if (left != nullptr) {
-                            auto result = left->remove(value, factory);
-                            if (left->element_count == 0) {
-                                removeChildNode(left, factory);
-                            }
-                            return result;
-                        }
-                        return false;
-                    } else if (value > elements[element_count - 1]) {
-                        if (right != nullptr) {
-                            auto result = right->remove(value, factory);
-                            if (right->element_count == 0) {
-                                removeChildNode(right, factory);
-                            }
-                            return result;
-                        }
-                        return false;
-                    }
-                    for (int index = 0; index < element_count; index++) {
-                        if (elements[index] == value) {
-                            // We found the value. Delete it by shifting anything to its right over.
-                            for (int index2 = index; index2 < element_count - 1; index2++) {
-                                elements[index2] = elements[index2 + 1];
-                            }
-                            element_count--;
-                            break;
-                        }
-                    }
-
-                    return false;
-                }
-
-                return ((left != nullptr && left->remove(value, factory)) ||
-                        (right != nullptr && right->remove(value, factory)));
             }
 
             void print() {
@@ -454,7 +425,7 @@ namespace jim {
         public:
             UnrolledBinaryTree() {
                 factory = new Factory();
-                root = factory->make_node();
+                root = nullptr;
             }
 
             // 1. Destructor.
@@ -470,7 +441,11 @@ namespace jim {
             // 2. Copy Constructor (Deep Copy)
             UnrolledBinaryTree(const UnrolledBinaryTree& other) {
                 factory = new Factory();
-                root = other.root->clone(*factory);
+                if (other.root != nullptr) {
+                    root = other.root->clone(*factory);
+                } else {
+                    root = nullptr;
+                }
                 std::cout << "Copy constructed\n";
             }
 
@@ -513,28 +488,35 @@ namespace jim {
             }
 
             bool contains(T value) {
-                return root->contains(value);
+                return root && root->contains(value);
             }
 
             void insert(T value) {
+                if (root == nullptr) {
+                    root = factory->make_node();
+                }
                 root->insert(value, *factory);
             }
 
-            bool remove(T value) {
-                return root->remove(value, *factory);
+            void remove(T value) {
+                if (root) {
+                    root = root->remove(root, value, *factory);
+                }
             }
 
             void print() {
                 std::cout << "-----" << std::endl;
-                root->print();
+                if (root != nullptr) {
+                    root->print();
+                }
                 std::cout << "-----" << std::endl;
             }
 
             // Re-export of UnrolledBinaryTreeNode iterator.
             using Iterator = typename Node::Iterator;
 
-            Iterator begin() { return root->begin(); }
-            Iterator end()   { return root->end(); }
+            Iterator begin() { return root ? root->begin() : Iterator(); }
+            Iterator end()   { return root ? root->end() : Iterator(); }
         };
    }
 }
