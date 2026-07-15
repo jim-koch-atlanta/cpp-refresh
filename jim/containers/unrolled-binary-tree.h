@@ -166,12 +166,14 @@ namespace jim {
                     // Case 2: Node has no left child (handles right-child-only nodes)
                     else if (node->left == nullptr) {
                         UnrolledBinaryTreeNode* temp = node->right;
+                        temp->parent = node->parent;
                         factory.destroy_node(node);
                         return temp;
                     }
                     // Case 3: Node has no right child (handles left-child-only nodes)
                     else if (node->right == nullptr) {
                         UnrolledBinaryTreeNode* temp = node->left;
+                        temp->parent = node->parent;
                         factory.destroy_node(node);
                         return temp;
                     }
@@ -186,11 +188,16 @@ namespace jim {
                         node->elements[i] = temp->elements[i];
                     }
 
-                    // Delete the inorder successor from the right subtree
+                    // Splice temp out: hang temp->right in whichever slot temp actually occupied
+                    // (temp is its parent's left child when findMin descended, right child when
+                    // the successor is node's immediate right child).
                     if (temp == temp->parent->left) {
-                        temp->parent->left = nullptr;
+                        temp->parent->left = temp->right;
                     } else {
-                        temp->parent->right = nullptr;
+                        temp->parent->right = temp->right;
+                    }
+                    if (temp->right != nullptr) {
+                        temp->right->parent = temp->parent;
                     }
                     factory.destroy_node(temp);
                 }
@@ -467,6 +474,7 @@ namespace jim {
 
             // 4. Move Constructor
             UnrolledBinaryTree(UnrolledBinaryTree&& other) noexcept {
+                delete factory;
                 root = other.root;
                 factory = other.factory;
                 other.root = nullptr;
@@ -478,6 +486,7 @@ namespace jim {
             UnrolledBinaryTree& operator=(UnrolledBinaryTree&& other) noexcept {
                 if (this != &other) {
                     factory->destroy_subtree(root);   // free our whole existing tree
+                    delete factory;
                     root = other.root;
                     factory = other.factory;
                     other.root = nullptr;
