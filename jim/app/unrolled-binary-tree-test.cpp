@@ -66,7 +66,7 @@ namespace jim {
 
                 // **Delete** values 11 to 20.
                 for (int i = 11; i <= 20; i++) {
-                    tree.remove(i);
+                    assert(true == tree.remove(i));
                 }
 
                 // Insert values 21 to 30.
@@ -92,7 +92,7 @@ namespace jim {
                     tree.insert(i);
                 }
 
-                tree.remove(10);
+                assert(true == tree.remove(10));
 
                 // Print the values in the tree.
                 tree.print();
@@ -242,8 +242,8 @@ namespace jim {
             assert((before == std::vector<int>{5, 10, 11, 15, 50, 51, 90}));
 
             // Empty node C ([10, 11]) -> triggers the two-children merge.
-            tree.remove(10);
-            tree.remove(11);
+            assert(true == tree.remove(10));
+            assert(true == tree.remove(11));
 
             std::vector<int> after = inorder();
             std::cout << "after:  ";
@@ -276,8 +276,8 @@ namespace jim {
             assert((before == std::vector<int>{5, 10, 11, 15, 50, 51, 90}));
 
             // Empty node C ([10, 11]) -> triggers the two-children merge.
-            tree.remove(10);
-            tree.remove(11);
+            assert(true == tree.remove(10));
+            assert(true == tree.remove(11));
 
             std::vector<int> after = inorder();
             std::cout << "after:  ";

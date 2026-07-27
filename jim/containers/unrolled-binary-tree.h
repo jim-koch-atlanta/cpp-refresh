@@ -114,7 +114,7 @@ namespace jim {
             }            
 
             // Helper function to find the minimum value node in a given subtree
-            void removeValue(UnrolledBinaryTreeNode* node, T value) {
+            bool removeValue(UnrolledBinaryTreeNode* node, T value) {
                 bool found = false;
                 for (int i = 0; i < node->element_count; i++) {
                     if (node->elements[i] == value) {
@@ -128,80 +128,89 @@ namespace jim {
                 if (found) {
                     node->element_count--;
                 }
+
+                return found;
             }            
 
             // Function to delete a node from the BST
             template <typename Factory>
-            UnrolledBinaryTreeNode* remove(UnrolledBinaryTreeNode* node, T value, Factory& factory) {
+            std::pair<UnrolledBinaryTreeNode*, bool> remove(UnrolledBinaryTreeNode* node, T value, Factory& factory) {
                 // Base Case: The value does not exist in the tree
                 if (node == nullptr) {
-                    return node;
+                    return {node, false};
                 }
 
                 // Step 1: Navigate down the tree to locate the target node
                 if (value < node->elements[0]) {
-                    node->left = remove(node->left, value, factory);
+                    auto [nodeLeft, removed] = remove(node->left, value, factory);
+                    node->left = nodeLeft;
+                    return {node, removed};
                 } 
-                else if (value > node->elements[node->element_count - 1]) {
-                    node->right = remove(node->right, value, factory);
+                
+                if (value > node->elements[node->element_count - 1]) {
+                    auto [nodeRight, removed] = remove(node->right, value, factory);
+                    node->right = nodeRight;
+                    return {node, removed};
                 } 
+
                 // Step 2: The node matches the value; process the deletion
-                else {
-                    if (node->element_count > 1) {
-                        // If there's more than one value, we don't have to delete a node.
-                        removeValue(node, value);
-                        return node;
-                    } else if (node->elements[0] != value) {
-                        // If there's only one value and it's not **the** value, just return.
-                        return node;
-                    }
-
-                    // There's only one value, and it's **the** value.
-
-                    // Case 1 & Case 2: Node has no children (leaf).
-                    if (node->left == nullptr && node->right == nullptr) {
-                        factory.destroy_node(node);
-                        return nullptr;
-                    }
-                    // Case 2: Node has no left child (handles right-child-only nodes)
-                    else if (node->left == nullptr) {
-                        UnrolledBinaryTreeNode* temp = node->right;
-                        temp->parent = node->parent;
-                        factory.destroy_node(node);
-                        return temp;
-                    }
-                    // Case 3: Node has no right child (handles left-child-only nodes)
-                    else if (node->right == nullptr) {
-                        UnrolledBinaryTreeNode* temp = node->left;
-                        temp->parent = node->parent;
-                        factory.destroy_node(node);
-                        return temp;
-                    }
-
-                    // Case 4: Node has two children
-                    // Get the inorder successor (smallest element in the right subtree)
-                    UnrolledBinaryTreeNode* temp = findMin(node->right);
-
-                    // Copy the inorder successor's data to this node
-                    node->element_count = temp->element_count;
-                    for (int i = 0; i < temp->element_count; i++) {
-                        node->elements[i] = temp->elements[i];
-                    }
-
-                    // Splice temp out: hang temp->right in whichever slot temp actually occupied
-                    // (temp is its parent's left child when findMin descended, right child when
-                    // the successor is node's immediate right child).
-                    if (temp == temp->parent->left) {
-                        temp->parent->left = temp->right;
-                    } else {
-                        temp->parent->right = temp->right;
-                    }
-                    if (temp->right != nullptr) {
-                        temp->right->parent = temp->parent;
-                    }
-                    factory.destroy_node(temp);
+                if (node->element_count > 1) {
+                    // If there's more than one value, we don't have to delete a node.
+                    bool removed = removeValue(node, value);
+                    return {node, removed};
+                } else if (node->elements[0] != value) {
+                    // If there's only one value and it's not **the** value, just return.
+                    return {node, false};
                 }
-                return node;
+
+                // There's only one value, and it's **the** value.
+
+                // Case 1: Node has no children (leaf).
+                if (node->left == nullptr && node->right == nullptr) {
+                    factory.destroy_node(node);
+                    return {nullptr, true};
+                }
+
+                // Case 2: Node has no left child (handles right-child-only nodes)
+                if (node->left == nullptr) {
+                    UnrolledBinaryTreeNode* temp = node->right;
+                    temp->parent = node->parent;
+                    factory.destroy_node(node);
+                    return {temp, true};
+                }
+                
+                // Case 3: Node has no right child (handles left-child-only nodes)
+                if (node->right == nullptr) {
+                    UnrolledBinaryTreeNode* temp = node->left;
+                    temp->parent = node->parent;
+                    factory.destroy_node(node);
+                    return {temp, true};
+                }
+
+                // Case 4: Node has two children
+                // Get the inorder successor (smallest element in the right subtree)
+                UnrolledBinaryTreeNode* temp = findMin(node->right);
+
+                // Copy the inorder successor's data to this node
+                node->element_count = temp->element_count;
+                for (int i = 0; i < temp->element_count; i++) {
+                    node->elements[i] = temp->elements[i];
+                }
+
+                // Splice temp out: hang temp->right in whichever slot temp actually occupied
+                // (temp is its parent's left child when findMin descended, right child when
+                // the successor is node's immediate right child).
+                if (temp == temp->parent->left) {
+                    temp->parent->left = temp->right;
+                } else {
+                    temp->parent->right = temp->right;
+                }
+                if (temp->right != nullptr) {
+                    temp->right->parent = temp->parent;
+                }
+                factory.destroy_node(temp);
+
+                return {node, true};
             }
 
             template <typename Factory>
@@ -506,10 +515,14 @@ namespace jim {
                 root->insert(value, *factory);
             }
 
-            void remove(T value) {
+            bool remove(T value) {
                 if (root) {
-                    root = root->remove(root, value, *factory);
+                    auto [newRoot, removed] = root->remove(root, value, *factory);
+                    root = newRoot;
+                    return removed;
                 }
+
+                return false;
             }
 
             void print() {

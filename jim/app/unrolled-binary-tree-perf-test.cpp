@@ -124,7 +124,7 @@ namespace jim {
                         if (op.op == 0) {
                             tree.insert(op.value);
                         } else {
-                            tree.remove(op.value);
+                            if (!tree.remove(op.value)) throw std::runtime_error("Failed removal for existing element.");
                         }
                     }
                     auto end = std::chrono::steady_clock::now();
@@ -154,7 +154,7 @@ namespace jim {
                         if (op.op == 0) {
                             tree.insert(op.value);
                         } else {
-                            tree.remove(op.value);
+                            if (!tree.remove(op.value)) throw std::runtime_error("Failed removal for existing element.");
                         }
                     }
                     auto end = std::chrono::steady_clock::now();
