@@ -474,7 +474,6 @@ namespace jim {
 
             // 4. Move Constructor
             UnrolledBinaryTree(UnrolledBinaryTree&& other) noexcept {
-                delete factory;
                 root = other.root;
                 factory = other.factory;
                 other.root = nullptr;

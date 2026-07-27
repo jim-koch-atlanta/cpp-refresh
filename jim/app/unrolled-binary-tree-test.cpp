@@ -136,13 +136,13 @@ namespace jim {
                 tree2 = tree1;
             }
 
-           {
+            {
                 std::cout << "Case 3: Move constructor" << std::endl;
                 UnrolledBinaryTree<int, 10> tree1;
                 UnrolledBinaryTree<int, 10> tree2(std::move(tree1));
             }
 
-           {
+            {
                 std::cout << "Case 4: Move operator" << std::endl;
                 UnrolledBinaryTree<int, 10> tree1;
                 UnrolledBinaryTree<int, 10> tree2;
