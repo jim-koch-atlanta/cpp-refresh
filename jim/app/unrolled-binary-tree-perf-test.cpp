@@ -2,6 +2,7 @@
 #include <cassert>
 #include <chrono>
 #include <format>
+#include <memory_resource>
 #include <optional>
 #include <ranges>
 #include <vector>
@@ -59,6 +60,38 @@ namespace jim {
                         tree.insert(std::rand());
                     }
 
+                    auto start = std::chrono::steady_clock::now();
+                    for (int i : std::views::iota(1, numberOfInsertions + 1)) {
+                        tree.insert(std::rand());
+                    }
+                    auto end = std::chrono::steady_clock::now();
+
+                    std::chrono::duration<double, std::milli> elapsed = end - start;
+                    if (!fastestRun || elapsed < *fastestRun) {
+                        fastestRun = elapsed;
+                    }
+                }
+                std::cout << "Fastest of " << numberOfPerfRuns << " run(s): "
+                          << fastestRun.value().count() << " ms\n";
+            }
+
+            {
+                std::cout << "=== pmr ===" << std::endl;
+
+                // Run the workload numberOfPerfRuns times and keep the fastest -- the min
+                // filters out OS scheduling noise better than a single sample or a mean.
+                std::optional<std::chrono::duration<double, std::milli>> fastestRun;
+                for (int perfRun : std::views::iota(0, numberOfPerfRuns)) {
+                    // Fresh, identically-primed tree each run so every run measures the
+                    // SAME workload from the SAME starting state (priming is untimed).
+                    std::srand(1);
+                    std::pmr::monotonic_buffer_resource buffer;
+                    UnrolledBinaryTree<int, 1, std::pmr::polymorphic_allocator<int>> tree{ &buffer };
+                    for (int i : std::views::iota(1, 101)) {
+                        tree.insert(std::rand());
+                    }
+
+                    // Timed section.
                     auto start = std::chrono::steady_clock::now();
                     for (int i : std::views::iota(1, numberOfInsertions + 1)) {
                         tree.insert(std::rand());
@@ -149,6 +182,40 @@ namespace jim {
                         tree.insert(std::rand());
                     }
 
+                    auto start = std::chrono::steady_clock::now();
+                    for (Operation op : operations) {
+                        if (op.op == 0) {
+                            tree.insert(op.value);
+                        } else {
+                            if (!tree.remove(op.value)) throw std::runtime_error("Failed removal for existing element.");
+                        }
+                    }
+                    auto end = std::chrono::steady_clock::now();
+
+                    std::chrono::duration<double, std::milli> elapsed = end - start;
+                    if (!fastestRun || elapsed < *fastestRun) {
+                        fastestRun = elapsed;
+                    }
+                }
+                std::cout << "Fastest of " << numberOfPerfRuns << " run(s): "
+                          << fastestRun.value().count() << " ms\n";
+            }
+
+            {
+                std::cout << "=== pmr ===" << std::endl;
+
+                std::optional<std::chrono::duration<double, std::milli>> fastestRun;
+                for (int perfRun : std::views::iota(0, numberOfPerfRuns)) {
+                    // Fresh, identically-primed tree each run (untimed) -> the replay below
+                    // measures the same operation stream from the same starting state.
+                    std::srand(1);
+                    std::pmr::monotonic_buffer_resource buffer;
+                    UnrolledBinaryTree<int, 1, std::pmr::polymorphic_allocator<int>> tree{ &buffer };
+                    for (int i : std::views::iota(1, 101)) {
+                        tree.insert(std::rand());
+                    }
+
+                    // Timed section: replay the pre-built operation stream.
                     auto start = std::chrono::steady_clock::now();
                     for (Operation op : operations) {
                         if (op.op == 0) {

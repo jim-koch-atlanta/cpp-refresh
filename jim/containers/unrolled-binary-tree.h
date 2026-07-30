@@ -444,6 +444,11 @@ namespace jim {
                 root = nullptr;
             }
 
+            UnrolledBinaryTree(std::pmr::memory_resource* mr) {
+                factory = new Factory(Alloc(mr));
+                root = nullptr;
+            }
+
             // 1. Destructor.
             ~UnrolledBinaryTree() {
                 // On a move, factory would be null.
